@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>From Overfitting to 95.28%: Building a Flower Classifier with EfficientNetB0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:         #17171a;
+    --ink-2:       #3a3a42;
+    --ink-3:       #72727e;
+    --ink-4:       #aaaab4;
+    --page:        #fdfcfa;
+    --surface:     #f4f3f0;
+    --surface2:    #ebe9e4;
+    --border:      #e0ddd6;
+    --accent:      #2563eb;
+    --accent-soft: #eff4ff;
+    --red:         #dc2626;
+    --red-soft:    #fef2f2;
+    --green:       #16a34a;
+    --green-soft:  #f0fdf4;
+    --amber:       #d97706;
+    --amber-soft:  #fffbeb;
+    --code-bg:     #f0eff0;
+    --serif:   'Lora', Georgia, serif;
+    --sans:    'IBM Plex Sans', system-ui, sans-serif;
+    --mono:    'IBM Plex Mono', 'Courier New', monospace;
+  }
+
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.78;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hero {
+    background: var(--ink);
+    color: #fdfcfa;
+    padding: 72px 24px 64px;
+    text-align: center;
+  }
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6b9cf7;
+    margin-bottom: 22px;
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-size: clamp(26px, 4.5vw, 50px);
+    font-weight: 700;
+    line-height: 1.17;
+    max-width: 800px;
+    margin: 0 auto 22px;
+  }
+  .hero h1 .hi { color: #93c5fd; font-style: italic; }
+  .hero-sub {
+    font-size: 15.5px;
+    color: rgba(253,252,250,0.55);
+    max-width: 520px;
+    margin: 0 auto 36px;
+    line-height: 1.65;
+  }
+  .hero-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 12px;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 4px;
+    color: rgba(253,252,250,0.5);
+    letter-spacing: 0.05em;
+  }
+
+  .metrics-band { display: flex; justify-content: center; flex-wrap: wrap; background: #1e293b; }
+  .metric { padding: 20px 44px; text-align: center; border-right: 1px solid rgba(255,255,255,0.07); }
+  .metric:last-child { border-right: none; }
+  .metric-num { font-family: var(--serif); font-size: 30px; font-weight: 700; color: #93c5fd; display: block; line-height: 1.1; margin-bottom: 4px; }
+  .metric-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255,255,255,0.35); }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 64px 24px 88px; }
+
+  h2 { font-family: var(--serif); font-size: 27px; font-weight: 700; line-height: 1.28; margin: 60px 0 16px; padding-bottom: 14px; border-bottom: 1.5px solid var(--border); color: var(--ink); }
+  h3 { font-family: var(--sans); font-size: 16.5px; font-weight: 600; margin: 36px 0 10px; color: var(--ink); }
+  p { margin-bottom: 16px; color: var(--ink-2); }
+  strong { font-weight: 600; color: var(--ink); }
+  code { font-family: var(--mono); font-size: 13.5px; background: var(--code-bg); padding: 2px 6px; border-radius: 3px; color: #1d4ed8; }
+  pre { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 22px 26px; overflow-x: auto; margin: 24px 0; font-family: var(--mono); font-size: 13px; line-height: 1.75; border: 1px solid #1e293b; }
+  pre .c  { color: #64748b; }
+  pre .k  { color: #7dd3fc; }
+  pre .s  { color: #86efac; }
+  pre .n  { color: #fca5a5; }
+  pre .f  { color: #c4b5fd; }
+  pre .cl { color: #fde68a; }
+
+  .sec-tag { display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 16px 22px; border-radius: 0 6px 6px 0; margin: 24px 0; }
+  .callout.warn  { border-color: var(--amber); background: var(--amber-soft); }
+  .callout.ok    { border-color: var(--green); background: var(--green-soft); }
+  .callout.alert { border-color: var(--red);   background: var(--red-soft);   }
+  .callout-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 7px; font-weight: 500; color: var(--accent); }
+  .callout.warn  .callout-label { color: var(--amber); }
+  .callout.ok    .callout-label { color: var(--green); }
+  .callout.alert .callout-label { color: var(--red); }
+  .callout p { margin: 0; color: var(--ink); font-size: 15px; }
+
+  .log-block { background: #0f172a; border-radius: 8px; padding: 18px 22px; margin: 20px 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.8; overflow-x: auto; border: 1px solid #1e293b; }
+  .log-ep  { color: #64748b; }
+  .log-tr  { color: #86efac; }
+  .log-val { color: #7dd3fc; }
+  .log-gap { color: #fca5a5; }
+  .log-note{ color: #fde68a; }
+  .log-sep { border-top: 1px solid #1e293b; margin: 8px 0; }
+
+  .arch-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin: 24px 0; }
+  .arch-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-4); margin-bottom: 18px; }
+  .arch-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 4px; font-weight: 500; }
+  .arch-row.frozen  { background: #f8f7f4; color: var(--ink-3); border: 1px solid var(--border); }
+  .arch-row.partial { background: #fefce8; color: #713f12;       border: 1px solid #fef08a; }
+  .arch-row.custom  { background: #eff6ff; color: #1e3a8a;       border: 1px solid #bfdbfe; }
+  .arch-row.out     { background: #f0fdf4; color: #14532d;       border: 1px solid #bbf7d0; }
+  .arch-row .sub    { font-size: 11.5px; font-weight: 400; opacity: 0.65; margin-top: 1px; }
+  .arch-badge { margin-left: auto; flex-shrink: 0; font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 500; }
+  .b-frozen  { background: var(--surface2); color: var(--ink-3); }
+  .b-partial { background: #fef08a; color: #713f12; }
+  .b-custom  { background: #bfdbfe; color: #1e3a8a; }
+  .b-out     { background: #bbf7d0; color: #14532d; }
+  .arch-arrow { text-align: center; color: var(--ink-4); padding: 2px 0; font-size: 13px; }
+
+  table.data { width: 100%; border-collapse: collapse; margin: 22px 0; font-size: 14px; }
+  table.data th { background: var(--ink); color: #fdfcfa; padding: 10px 14px; text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 500; }
+  table.data td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+  table.data tr:hover td { background: var(--surface); }
+  .mono-cell { font-family: var(--mono); font-size: 13px; }
+  .num-cell  { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+
+  table.cmp { width: 100%; border-collapse: collapse; margin: 22px 0; font-size: 13.5px; }
+  table.cmp th { padding: 11px 14px; text-align: center; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; border-bottom: 2px solid var(--border); font-weight: 500; color: var(--ink-3); }
+  table.cmp th:first-child { text-align: left; }
+  table.cmp td { padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: center; line-height: 1.4; }
+  table.cmp td:first-child { text-align: left; font-weight: 500; font-size: 13.5px; }
+  table.cmp .yes  { color: var(--green); font-weight: 600; font-size: 15px; }
+  table.cmp .no   { color: var(--ink-4); font-size: 15px; }
+  table.cmp .mono { font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
+  table.cmp .best-val { color: var(--green); font-weight: 700; font-family: var(--mono); font-size: 13px; }
+  table.cmp .bad-val  { color: var(--red);   font-weight: 700; font-family: var(--mono); font-size: 13px; }
+
+  .result-banner { background: var(--ink); color: white; border-radius: 8px; padding: 32px 28px; margin: 32px 0; display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; }
+  .result-main .big { font-family: var(--serif); font-size: 60px; font-weight: 700; color: #93c5fd; line-height: 1; }
+  .result-main .lbl { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.35); margin-top: 6px; }
+  .result-grid { display: flex; gap: 28px; flex-wrap: wrap; }
+  .result-item .n { font-family: var(--serif); font-size: 24px; font-weight: 700; color: white; }
+  .result-item .l { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.35); margin-top: 3px; }
+  .divline { width: 1px; background: rgba(255,255,255,0.1); align-self: stretch; }
+
+  .bar-rows { margin: 20px 0; }
+  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 9px; }
+  .bar-name { font-family: var(--mono); font-size: 12px; color: var(--ink-3); width: 88px; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 22px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 10px; font-family: var(--mono); font-size: 11.5px; color: white; font-weight: 500; }
+  .bar-pct   { font-family: var(--mono); font-size: 12px; color: var(--ink-3); width: 44px; text-align: right; }
+
+  .tech-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; }
+  .tech-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+  .tech-card h4 { font-size: 14.5px; font-weight: 600; margin-bottom: 8px; }
+  .tech-card p  { font-size: 13.5px; color: var(--ink-3); margin: 0; line-height: 1.6; }
+  .tech-card .tag { font-family: var(--mono); font-size: 10px; color: var(--accent); background: var(--accent-soft); padding: 2px 6px; border-radius: 3px; display: inline-block; margin-bottom: 9px; }
+
+  .steps { margin: 22px 0; }
+  .step { display: grid; grid-template-columns: 36px 1fr; gap: 14px; margin-bottom: 18px; align-items: start; }
+  .step-n { width: 36px; height: 36px; border-radius: 50%; background: var(--ink); color: white; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 16px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .step-b h4 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+  .step-b p  { font-size: 13.5px; color: var(--ink-3); margin: 0; line-height: 1.6; }
+  .ptag { display: inline-block; font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 3px; margin-right: 5px; font-weight: 500; }
+  .ptag.med  { background: #e0f2fe; color: #075985; }
+  .ptag.hash { background: #f3e8ff; color: #5b21b6; }
+  .ptag.kag  { background: #ffe4e6; color: #9f1239; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 26px; margin: 28px 0 44px; }
+  .toc-title { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-4); margin-bottom: 12px; }
+  .toc ol { padding-left: 18px; margin: 0; }
+  .toc li { margin-bottom: 5px; }
+  .toc a { text-decoration: none; color: var(--ink-3); font-size: 14px; }
+  .toc a:hover { color: var(--accent); }
+
+  .footer { background: var(--ink); color: rgba(253,252,250,0.35); text-align: center; padding: 36px 24px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+  @media (max-width: 580px) {
+    .tech-grid { grid-template-columns: 1fr; }
+    .metric { padding: 16px 20px; }
+    .result-banner { grid-template-columns: 1fr; }
+    .divline { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-eyebrow">Transfer Learning · Computer Vision · TensorFlow</div>
+  <h1>From Overfitting to <span class="hi">95.28% Accuracy</span>:<br>A Flower Classifier Built with EfficientNetB0</h1>
+  <p class="hero-sub">Three progressively better models — baseline, regularized, and fine-tuned — on the tf_flowers dataset. Real training logs, real numbers, real lessons.</p>
+  <div class="hero-chips">
+    <span class="chip">EfficientNetB0</span>
+    <span class="chip">TensorFlow 2.x</span>
+    <span class="chip">Google Colab T4</span>
+    <span class="chip">tf_flowers · 3,670 images</span>
+    <span class="chip">5 flower classes</span>
+  </div>
+</header>
+
+<div class="metrics-band">
+  <div class="metric"><span class="metric-num">95.28%</span><span class="metric-label">Best Val Accuracy</span></div>
+  <div class="metric"><span class="metric-num">5.51%</span><span class="metric-label">Baseline Overfit Gap</span></div>
+  <div class="metric"><span class="metric-num">1.88%</span><span class="metric-label">Regularized Gap</span></div>
+  <div class="metric"><span class="metric-num">4.84M</span><span class="metric-label">Trainable Params</span></div>
+</div>
+
+<main class="wrap">
+
+  <div class="toc">
+    <div class="toc-title">Table of Contents</div>
+    <ol>
+      <li><a href="#intro">Introduction</a></li>
+      <li><a href="#data">The Dataset</a></li>
+      <li><a href="#pipeline">Preprocessing — The Silent Killer Bug</a></li>
+      <li><a href="#arch">Model Architecture: All 244 Layers</a></li>
+      <li><a href="#baseline">Model 1 — Baseline (Train 99.88% / Val 94.37%)</a></li>
+      <li><a href="#reg">Model 2 — Regularized (Best Val 95.10%, Gap 1.88%)</a></li>
+      <li><a href="#ft">Model 3 — Fine-Tuned (Best Val 95.28%)</a></li>
+      <li><a href="#results">Full Results &amp; Per-Class Analysis</a></li>
+      <li><a href="#lessons">Lessons Learned</a></li>
+      <li><a href="#publish">Where &amp; How to Publish</a></li>
+    </ol>
+  </div>
+
+  <!-- 01 -->
+  <div id="intro">
+    <span class="sec-tag">01 — Introduction</span>
+    <h2>Why This Project?</h2>
+    <p>Transfer learning promises to let you borrow a model trained on millions of images and adapt it to your own task in a few hours on a single GPU. But the gap between "it runs" and "it generalizes well" is filled with subtle, silent traps.</p>
+    <p>In a previous attempt at this exact notebook, accuracy was near-random. The model structure was right. The optimizer was right. The bug was a single division — <code>/ 255.0</code> — applied before feeding images to a model whose first internal layer is already a normalization step. That one line quietly broke every prediction while the loss still appeared to converge normally.</p>
+    <p>This post documents everything that came after fixing that bug: three models, the actual epoch-by-epoch training output, and an honest breakdown of what each architectural and training change actually did.</p>
+  </div>
+
+  <!-- 02 -->
+  <div id="data">
+    <span class="sec-tag">02 — Dataset</span>
+    <h2>The tf_flowers Dataset</h2>
+    <p>We used TensorFlow's built-in <code>tf_flowers</code>: 3,670 images across five flower categories, split 70% train / 15% validation / 15% test. At batch size 32 that gives 81 training batches, 18 validation batches, and 18 test batches. Images vary in lighting, background, scale, and angle — a realistic diversity for a classification task.</p>
+
+    <table class="data">
+      <thead><tr><th>Class</th><th>Total Images</th><th>Per-Class Test Accuracy</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Dandelion</strong></td><td class="mono-cell">898</td><td class="num-cell">96.4%</td></tr>
+        <tr><td><strong>Daisy</strong></td><td class="mono-cell">633</td><td class="num-cell">91.6%</td></tr>
+        <tr><td><strong>Tulips</strong></td><td class="mono-cell">799</td><td class="num-cell">96.3%</td></tr>
+        <tr><td><strong>Sunflowers</strong></td><td class="mono-cell">699</td><td class="num-cell">96.1%</td></tr>
+        <tr><td><strong>Roses</strong></td><td class="mono-cell">641</td><td class="num-cell">89.7%</td></tr>
+      </tbody>
+    </table>
+
+    <p>All images were resized to 224 × 224 to match EfficientNetB0's expected input dimensions.</p>
+  </div>
+
+  <!-- 03 -->
+  <div id="pipeline">
+    <span class="sec-tag">03 — Preprocessing</span>
+    <h2>The Preprocessing Pipeline — and the Silent Killer</h2>
+
+    <div class="callout alert">
+      <div class="callout-label">Root Cause of the Previous Run's Failure</div>
+      <p>Dividing images by <code>255.0</code> before EfficientNetB0 shifts pixel values from <code>[0, 255]</code> to <code>[0, 1]</code>. EfficientNetB0's internal <code>Rescaling</code> layer is designed for raw <code>[0, 255]</code> float32 input — not pre-normalized input. Feeding pre-normalized values pushes activations far outside the distribution the pretrained weights expect, producing near-random outputs. The model still "trains" — loss decreases, the optimizer updates weights — but it's fitting garbage inputs to labels.</p>
+    </div>
+
+    <p>The fix is simple: cast to float32, resize, and stop. Let EfficientNet handle normalization internally. The sanity check at the end of the pipeline confirmed it worked: <code>min=0.0, max=255.0</code>.</p>
+
+<pre><span class="c"># CORRECT — keep values in [0, 255], no division</span>
+<span class="k">def</span> <span class="f">preprocess</span>(image, label):
+    image = tf.image.<span class="f">resize</span>(image, [<span class="n">224</span>, <span class="n">224</span>])
+    image = tf.<span class="f">cast</span>(image, tf.float32)  <span class="c"># ← no /255</span>
+    <span class="k">return</span> image, label
+
+<span class="c"># Augmentation pipeline — applied to training set only</span>
+data_augmentation = tf.keras.<span class="cl">Sequential</span>([
+    <span class="f">RandomFlip</span>(<span class="s">'horizontal'</span>),
+    <span class="f">RandomRotation</span>(<span class="n">0.2</span>),
+    <span class="f">RandomZoom</span>(<span class="n">0.15</span>),
+    <span class="f">RandomContrast</span>(<span class="n">0.2</span>),
+    <span class="f">RandomTranslation</span>(<span class="n">0.1</span>, <span class="n">0.1</span>),
+    <span class="f">RandomBrightness</span>(<span class="n">0.1</span>),
+])</pre>
+
+    <p>Two separate pipelines were built: <code>train_ds_base</code> (no augmentation, used for the baseline model) and <code>train_ds_aug</code> (with augmentation, used for the regularized and fine-tuned models). Validation and test sets never receive augmentation.</p>
+  </div>
+
+  <!-- 04 -->
+  <div id="arch">
+    <span class="sec-tag">04 — Architecture</span>
+    <h2>Model Architecture: All 244 Layers</h2>
+    <p>The complete model has two parts: the pretrained <strong>EfficientNetB0 base</strong> (237 internal layers loaded with ImageNet weights) and a <strong>custom classification head</strong> trained from scratch on tf_flowers (6 layers, 793,605 params in the regularized version, 4,843,176 total trainable params).</p>
+
+    <div class="arch-wrap">
+      <div class="arch-label">Full layer stack — EfficientNetB0 base + custom head</div>
+      <div class="arch-row frozen">
+        <div><div>Input — 224 × 224 × 3, float32, range [0, 255]</div></div>
+        <span class="arch-badge b-frozen">Input</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row frozen">
+        <div>
+          <div>Rescaling (Layer 1, internal to EfficientNetB0)</div>
+          <div class="sub">Normalizes [0,255] to the ImageNet pretrained distribution — always frozen, always first</div>
+        </div>
+        <span class="arch-badge b-frozen">Frozen</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row frozen">
+        <div>
+          <div>Stem conv + MBConv Stages 1–5 (Layers 2–217, ~216 layers)</div>
+          <div class="sub">Edges, textures, color gradients — universal ImageNet features, frozen across all three models</div>
+        </div>
+        <span class="arch-badge b-frozen">Frozen (~216)</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row partial">
+        <div>
+          <div>MBConv Stages 6–7, top EfficientNet layers (Layers 218–237)</div>
+          <div class="sub">Top 20 trainable for Baseline &amp; Regularized · Top 50 trainable for Fine-Tuned · high-level abstract features</div>
+        </div>
+        <span class="arch-badge b-partial">Partially Trainable</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row custom">
+        <div>
+          <div>GlobalAveragePooling2D (Layer 238)</div>
+          <div class="sub">7 × 7 × 1280 → 1,280 — averages 49 spatial values per channel, 0 trainable params</div>
+        </div>
+        <span class="arch-badge b-custom">Custom Head</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row custom">
+        <div>
+          <div>BatchNormalization (Layer 239)</div>
+          <div class="sub">5,120 params — γ, β, running mean, running variance per feature · absent in baseline</div>
+        </div>
+        <span class="arch-badge b-custom">Custom Head</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row custom">
+        <div>
+          <div>Dense(512, ReLU, L2) → Dropout(0.5) (Layers 240–241)</div>
+          <div class="sub">655,872 params · 50% neurons dropped per step · L2=1e-4 · absent in baseline</div>
+        </div>
+        <span class="arch-badge b-custom">Custom Head</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row custom">
+        <div>
+          <div>Dense(256, ReLU, L2) → Dropout(0.3) (Layers 242–243)</div>
+          <div class="sub">131,328 params · 30% neurons dropped · second abstraction stage · absent in baseline</div>
+        </div>
+        <span class="arch-badge b-custom">Custom Head</span>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row out">
+        <div>
+          <div>Dense(5, Softmax) (Layer 244)</div>
+          <div class="sub">1,285 params · outputs probability over 5 flower classes</div>
+        </div>
+        <span class="arch-badge b-out">Output</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 -->
+  <div id="baseline">
+    <span class="sec-tag">05 — Baseline</span>
+    <h2>Model 1 — Baseline: Demonstrating Overfitting</h2>
+    <p>The baseline uses EfficientNetB0 with the top 20 layers unfrozen and a custom head of two bare Dense layers — no BatchNorm, no Dropout, no L2, no callbacks. It trained on <code>train_ds_base</code> (no augmentation) for 30 epochs with no early stopping. Its purpose is diagnostic: show what happens when a large unconstrained head is placed on a small dataset.</p>
+
+<pre><span class="k">def</span> <span class="f">build_baseline</span>(num_classes):
+    base = <span class="cl">EfficientNetB0</span>(include_top=<span class="cl">False</span>, weights=<span class="s">'imagenet'</span>)
+    base.trainable = <span class="cl">True</span>
+    <span class="k">for</span> layer <span class="k">in</span> base.layers[:-<span class="n">20</span>]:
+        layer.trainable = <span class="cl">False</span>
+
+    x = <span class="f">GlobalAveragePooling2D</span>()(base.output)
+    x = <span class="f">Dense</span>(<span class="n">512</span>, activation=<span class="s">'relu'</span>)(x)  <span class="c"># no BatchNorm, no L2</span>
+    x = <span class="f">Dense</span>(<span class="n">256</span>, activation=<span class="s">'relu'</span>)(x)  <span class="c"># no Dropout</span>
+    out = <span class="f">Dense</span>(num_classes, activation=<span class="s">'softmax'</span>)(x)
+    <span class="c"># no EarlyStopping, no ReduceLROnPlateau</span></pre>
+
+    <p>Here is what the training log actually showed — selected epochs:</p>
+
+    <div class="log-block">
+<span class="log-ep">Epoch  1/30</span>  <span class="log-tr">acc: 0.7754  loss: 0.7929</span>  <span class="log-val">val_acc: 0.8875  val_loss: 0.3082</span>
+<span class="log-ep">Epoch  3/30</span>  <span class="log-tr">acc: 0.9486  loss: 0.1597</span>  <span class="log-val">val_acc: 0.9347  val_loss: 0.1925</span>  <span class="log-gap">← gap opens</span>
+<span class="log-ep">Epoch  6/30</span>  <span class="log-tr">acc: 0.9883  loss: 0.0433</span>  <span class="log-val">val_acc: 0.9292  val_loss: 0.1740</span>  <span class="log-gap">← train racing ahead</span>
+<span class="log-ep">Epoch 12/30</span>  <span class="log-tr">acc: 0.9973  loss: 0.0160</span>  <span class="log-val">val_acc: 0.9456  val_loss: 0.1833</span>  <span class="log-gap">← val plateaued</span>
+<span class="log-ep">Epoch 16/30</span>  <span class="log-tr">acc: 0.9992  loss: 0.0065</span>  <span class="log-val">val_acc: 0.9365  val_loss: 0.1896</span>  <span class="log-gap">← val acc declining</span>
+<span class="log-ep">Epoch 20/30</span>  <span class="log-tr">acc: 0.9984  loss: 0.0061</span>  <span class="log-val">val_acc: 0.9437  val_loss: 0.1878</span>
+<span class="log-ep">Epoch 30/30</span>  <span class="log-tr">acc: 0.9988  loss: 0.0059</span>  <span class="log-val">val_acc: 0.9437  val_loss: 0.2547</span>
+<div class="log-sep"></div>
+<span class="log-note">Baseline — Train: 0.9988 | Val: 0.9437 | Gap: 0.0551 (5.51%)</span>
+<span class="log-note">Val loss trend: 0.3082 (ep1) → 0.1740 (ep6) → 0.2547 (ep30) — rising despite accuracy</span>
+    </div>
+
+    <div class="callout warn">
+      <div class="callout-label">What This Gap Means</div>
+      <p>Training accuracy hit 99.88% while validation accuracy plateaued at 94.37%. That 5.51% gap is textbook overfitting. The two Dense layers — 655K+ combined parameters with no regularization — memorized training-set-specific patterns. Without augmentation, the model saw the same 2,500 images every epoch. Without EarlyStopping, it kept running 13 epochs past the point where validation improvement had stalled. The rising val_loss from epoch 6 onward is an early warning that went ignored because there was no callback watching for it.</p>
+    </div>
+  </div>
+
+  <!-- 06 -->
+  <div id="reg">
+    <span class="sec-tag">06 — Regularized Model</span>
+    <h2>Model 2 — Regularized: Closing the Gap to 1.88%</h2>
+    <p>Same EfficientNetB0 base, same top-20 unfrozen layers, same head dimensions. The total trainable parameters are 4,843,176 — identical capacity to the baseline. What changed is every constraint governing how the model learns.</p>
+
+<pre><span class="k">def</span> <span class="f">build_regularized</span>(num_classes):
+    l2_reg = tf.keras.regularizers.<span class="f">l2</span>(<span class="n">1e-4</span>)
+
+    x = <span class="f">GlobalAveragePooling2D</span>()(base.output)
+    x = <span class="f">BatchNormalization</span>()(x)                               <span class="c"># new</span>
+    x = <span class="f">Dense</span>(<span class="n">512</span>, activation=<span class="s">'relu'</span>, kernel_regularizer=l2_reg)(x)
+    x = <span class="f">Dropout</span>(<span class="n">0.5</span>)(x)                                       <span class="c"># new</span>
+    x = <span class="f">Dense</span>(<span class="n">256</span>, activation=<span class="s">'relu'</span>, kernel_regularizer=l2_reg)(x)
+    x = <span class="f">Dropout</span>(<span class="n">0.3</span>)(x)                                       <span class="c"># new</span>
+    out = <span class="f">Dense</span>(num_classes, activation=<span class="s">'softmax'</span>)(x)
+
+callbacks = [
+    <span class="f">EarlyStopping</span>(monitor=<span class="s">'val_accuracy'</span>, patience=<span class="n">7</span>,
+                  restore_best_weights=<span class="cl">True</span>),
+    <span class="f">ReduceLROnPlateau</span>(monitor=<span class="s">'val_loss'</span>, factor=<span class="n">0.5</span>,
+                      patience=<span class="n">3</span>, min_lr=<span class="n">1e-7</span>)
+]</pre>
+
+    <h3>What Each Regularization Technique Does</h3>
+    <div class="tech-grid">
+      <div class="tech-card">
+        <span class="tag">Dropout 0.5 + 0.3</span>
+        <h4>Dropout</h4>
+        <p>Randomly zeros half the neurons in Dense-512 and 30% in Dense-256 each training step. No single neuron can memorize a training example. The network learns distributed, redundant representations instead of shortcuts.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tag">L2 = 1e-4</span>
+        <h4>L2 Regularization</h4>
+        <p>Adds a penalty to the loss proportional to the square of each weight. Large weights — the mechanism of memorization — become expensive to maintain. The optimizer learns to prefer many small, broadly useful weights.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tag">BatchNorm</span>
+        <h4>Batch Normalization</h4>
+        <p>Normalizes the 1,280 pooled features to zero mean and unit variance, then applies learned scale (γ) and shift (β). Stabilizes gradient flow through the head and adds mild noise that acts as an implicit regularizer.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tag">6 augmentations</span>
+        <h4>Data Augmentation</h4>
+        <p>Random flip, rotation ±20°, zoom ±15%, contrast ±20%, translation ±10%, brightness ±10%. The model never sees the exact same image twice — memorizing individual pixel patterns becomes impossible.</p>
+      </div>
+    </div>
+
+    <p>Here is the full training log with the key events marked:</p>
+
+    <div class="log-block">
+<span class="log-ep">Epoch  1/40</span>  <span class="log-tr">acc: 0.4597</span>  <span class="log-val">val_acc: 0.7804</span>  <span class="log-note">← augmentation makes ep1 hard; val already ahead</span>
+<span class="log-ep">Epoch  5/40</span>  <span class="log-tr">acc: 0.8400</span>  <span class="log-val">val_acc: 0.9183</span>  <span class="log-note">← 5 epochs in, already near baseline's best</span>
+<span class="log-ep">Epoch 10/40</span>  <span class="log-tr">acc: 0.9058</span>  <span class="log-val">val_acc: 0.9437</span>
+<span class="log-ep">Epoch 14/40</span>  <span class="log-tr">acc: 0.9237</span>  <span class="log-val">val_acc: 0.9456</span>  <span class="log-val">val_loss: 0.2582</span>
+<span class="log-ep">Epoch 16/40</span>  <span class="log-tr">acc: 0.9447</span>  <span class="log-val">val_acc: 0.9492</span>  <span class="log-val">val_loss: 0.2505</span>
+<span class="log-ep">Epoch 17/40</span>  <span class="log-tr">acc: 0.9311</span>  <span class="log-val">val_acc: 0.9510</span>  <span class="log-note">← best epoch · weights saved here</span>
+<span class="log-ep">Epoch 20/40</span>  <span class="log-tr">acc: 0.9517</span>  <span class="log-val">val_acc: 0.9456</span>
+<span class="log-ep">Epoch 23/40</span>  <span class="log-tr">acc: 0.9525</span>  <span class="log-val">val_acc: 0.9456</span>  <span class="log-note">ReduceLROnPlateau: LR 1e-4 → 5e-5</span>
+<span class="log-ep">Epoch 24/40</span>  <span class="log-tr">acc: 0.9661</span>  <span class="log-val">val_acc: 0.9474</span>  <span class="log-note">EarlyStopping fires (patience=7) · restoring epoch 17</span>
+<div class="log-sep"></div>
+<span class="log-note">Regularized — Train: 0.9661 | Val: 0.9474 | Gap: 0.0188 (1.88%)</span>
+<span class="log-note">Best val_accuracy (epoch 17): 0.9510</span>
+    </div>
+
+    <div class="callout ok">
+      <div class="callout-label">EarlyStopping: Why "Restoring epoch 17" Matters</div>
+      <p>Training ran to epoch 24 before EarlyStopping triggered. But the best validation accuracy occurred at epoch 17. With <code>restore_best_weights=True</code>, the model was rewound to epoch 17's weights before being returned. Without this flag, you get the epoch 24 model — which is worse. This flag is not optional; it is the entire value of EarlyStopping for model quality.</p>
+    </div>
+
+    <p>The gap fell from 5.51% (baseline) to 1.88% — a reduction of two-thirds — using the same model capacity, simply by adding regularization constraints and better training hygiene.</p>
+  </div>
+
+  <!-- 07 -->
+  <div id="ft">
+    <span class="sec-tag">07 — Fine-Tuning</span>
+    <h2>Model 3 — Fine-Tuning: Unlocking Deeper EfficientNet Layers</h2>
+    <p>Starting from the saved regularized model, we unfroze the <strong>top 50 layers</strong> of EfficientNetB0 (vs. top 20 previously) and recompiled at a much smaller learning rate.</p>
+
+<pre><span class="c"># Unfreeze top 50 layers of the EfficientNetB0 base</span>
+eff_base = reg_model.layers[<span class="n">1</span>]
+eff_base.trainable = <span class="cl">True</span>
+<span class="k">for</span> layer <span class="k">in</span> eff_base.layers[:-<span class="n">50</span>]:
+    layer.trainable = <span class="cl">False</span>
+
+<span class="c"># Recompile with learning rate 20× smaller than regularized phase</span>
+reg_model.<span class="f">compile</span>(
+    optimizer=<span class="f">Adam</span>(<span class="n">5e-6</span>),   <span class="c"># was 1e-4</span>
+    loss=<span class="s">'sparse_categorical_crossentropy'</span>,
+    metrics=[<span class="s">'accuracy'</span>]
+)</pre>
+
+    <div class="callout">
+      <div class="callout-label">Why 5e-6 and Not 1e-4?</div>
+      <p>The deep EfficientNetB0 layers encode features learned from 1.2 million ImageNet images. At <code>1e-4</code>, gradient updates are large enough to overwrite those features — a phenomenon called catastrophic forgetting. At <code>5e-6</code>, updates are tiny: weights shift gently toward the flower domain rather than being destroyed. The fine-tuning learning rate should generally be 10–50× smaller than the initial training learning rate.</p>
+    </div>
+
+    <div class="log-block">
+<span class="log-ep">Epoch 1/20</span>  <span class="log-tr">acc: 0.9439</span>  <span class="log-val">val_acc: 0.9528</span>  <span class="log-note">← immediate best · weights saved</span>
+<span class="log-ep">Epoch 2/20</span>  <span class="log-tr">acc: 0.9478</span>  <span class="log-val">val_acc: 0.9510</span>
+<span class="log-ep">Epoch 3/20</span>  <span class="log-tr">acc: 0.9498</span>  <span class="log-val">val_acc: 0.9510</span>
+<span class="log-ep">Epoch 4/20</span>  <span class="log-tr">acc: 0.9545</span>  <span class="log-val">val_acc: 0.9492</span>
+<span class="log-ep">Epoch 5/20</span>  <span class="log-tr">acc: 0.9533</span>  <span class="log-val">val_acc: 0.9510</span>
+<span class="log-ep">Epoch 6/20</span>  <span class="log-tr">acc: 0.9412</span>  <span class="log-val">val_acc: 0.9510</span>  <span class="log-note">EarlyStopping fires (patience=5) · restoring epoch 1</span>
+<div class="log-sep"></div>
+<span class="log-note">Fine-Tuned best val_accuracy: 0.9528</span>
+    </div>
+
+    <p>Fine-tuning peaked at epoch 1 and never improved beyond it. This is normal — the starting point (the regularized model) was already strong. The fine-tuning phase only needed to nudge the deeper EfficientNet layers gently toward the flower domain. EarlyStopping stopped training after 6 epochs, returning the epoch 1 weights.</p>
+  </div>
+
+  <!-- 08 -->
+  <div id="results">
+    <span class="sec-tag">08 — Results</span>
+    <h2>Full Results &amp; Per-Class Analysis</h2>
+
+    <div class="result-banner">
+      <div class="result-main">
+        <div class="big">95.28%</div>
+        <div class="lbl">Best Val Accuracy — Fine-Tuned Model (epoch 1)</div>
+      </div>
+      <div class="divline"></div>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="n">94.37%</div>
+          <div class="l">Baseline best val</div>
+        </div>
+        <div class="result-item">
+          <div class="n">95.10%</div>
+          <div class="l">Regularized best val</div>
+        </div>
+        <div class="result-item">
+          <div class="n">5.51%</div>
+          <div class="l">Baseline gap</div>
+        </div>
+        <div class="result-item">
+          <div class="n">1.88%</div>
+          <div class="l">Regularized gap</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Full Model Comparison</h3>
+    <table class="cmp">
+      <thead>
+        <tr><th>Setting</th><th>Baseline</th><th>Regularized</th><th>Fine-Tuned</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Preprocessing</td><td class="mono">[0,255] ✓</td><td class="mono">[0,255] ✓</td><td class="mono">[0,255] ✓</td></tr>
+        <tr><td>Data Augmentation</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>BatchNormalization</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>Dropout</td><td class="no">✗</td><td class="mono">0.5 + 0.3</td><td class="mono">0.5 + 0.3</td></tr>
+        <tr><td>L2 Regularizer</td><td class="no">✗</td><td class="mono">1e-4</td><td class="mono">1e-4</td></tr>
+        <tr><td>EarlyStopping</td><td class="no">✗</td><td class="yes">patience=7</td><td class="yes">patience=5</td></tr>
+        <tr><td>ReduceLROnPlateau</td><td class="no">✗</td><td class="yes">✓ (fired ep.23)</td><td class="no">✗</td></tr>
+        <tr><td>Base layers unfrozen</td><td class="mono">Top 20</td><td class="mono">Top 20</td><td class="mono">Top 50</td></tr>
+        <tr><td>Learning Rate</td><td class="mono">1e-4</td><td class="mono">1e-4</td><td class="mono">5e-6</td></tr>
+        <tr><td>Epochs trained</td><td class="mono">30 (no stop)</td><td class="mono">24 (best: ep.17)</td><td class="mono">6 (best: ep.1)</td></tr>
+        <tr><td>Final train accuracy</td><td class="bad-val">99.88%</td><td class="mono">96.61%</td><td class="mono">94.12%</td></tr>
+        <tr><td>Best val accuracy</td><td class="mono">94.37%</td><td class="mono">95.10%</td><td class="best-val">95.28%</td></tr>
+        <tr><td>Train-val gap</td><td class="bad-val">5.51%</td><td class="mono">1.88%</td><td class="best-val">~0.9%</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Per-Class Test Accuracy (Regularized Model, Confusion Matrix)</h3>
+    <div class="bar-rows">
+      <div class="bar-row">
+        <span class="bar-name">dandelion</span>
+        <div class="bar-track"><div class="bar-fill" style="width:96.4%;background:#1d4ed8;">96.4%</div></div>
+        <span class="bar-pct">0.964</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-name">tulips</span>
+        <div class="bar-track"><div class="bar-fill" style="width:96.3%;background:#1d4ed8;">96.3%</div></div>
+        <span class="bar-pct">0.963</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-name">sunflowers</span>
+        <div class="bar-track"><div class="bar-fill" style="width:96.1%;background:#1d4ed8;">96.1%</div></div>
+        <span class="bar-pct">0.961</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-name">daisy</span>
+        <div class="bar-track"><div class="bar-fill" style="width:91.6%;background:#3b82f6;">91.6%</div></div>
+        <span class="bar-pct">0.916</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-name">roses</span>
+        <div class="bar-track"><div class="bar-fill" style="width:89.7%;background:#60a5fa;">89.7%</div></div>
+        <span class="bar-pct">0.897</span>
+      </div>
+    </div>
+
+    <p>Dandelions, tulips, and sunflowers have the most distinctive silhouettes and color signatures, producing near-perfect per-class accuracy. Roses are the hardest class — high intra-class variation (varieties, bloom stages, colors) and visual similarity to other flowers like peonies means the model misclassifies a larger fraction. Daisies are similar: small, often similar to dandelions in color, with varied shooting distances in the dataset.</p>
+  </div>
+
+  <!-- 09 -->
+  <div id="lessons">
+    <span class="sec-tag">09 — Lessons</span>
+    <h2>Lessons Learned</h2>
+
+    <h3>1. Verify the input range before anything else</h3>
+    <p>EfficientNetB0's internal <code>Rescaling</code> layer expects <code>[0, 255]</code> float32 input. Dividing by 255 beforehand was the root cause of a previous run's near-random outputs — and there was no obvious error message, only bad predictions. The single-line sanity check <code>print(f"min={...}, max={...}")</code> takes two seconds to write and would have caught it immediately. Add it to every pipeline.</p>
+
+    <h3>2. High training accuracy is not the goal — the gap is</h3>
+    <p>The baseline reached 99.88% training accuracy. That number is meaningless when val accuracy is 94.37%. The regularized model peaked at 96.61% training accuracy — lower — but its val accuracy was 95.10%. Reducing the gap from 5.51% to 1.88% with no architectural change is a more meaningful result than hitting a high training ceiling.</p>
+
+    <h3>3. Regularization works as a system, not a toggle</h3>
+    <p>Dropout, L2, BatchNorm, augmentation, EarlyStopping, and ReduceLROnPlateau each close a different pathway to overfitting. No single technique alone would have halved the gap. Dropout prevents neuron-level memorization. L2 prevents weight explosion. BatchNorm stabilizes gradient flow. Augmentation prevents pixel memorization. EarlyStopping prevents overtraining. ReduceLROnPlateau allows recovery near the current minimum. Together they form a system.</p>
+
+    <h3>4. Fine-tune learning rate must be much smaller than initial LR</h3>
+    <p>We used <code>5e-6</code> for fine-tuning vs. <code>1e-4</code> for the regularized phase — a 20× reduction. Larger updates during fine-tuning overwrite pretrained features rather than adapting them. The ratio between fine-tuning LR and initial training LR should generally be 10–50×.</p>
+
+    <h3>5. EarlyStopping's best epoch is never the last epoch</h3>
+    <p>In the regularized run, epoch 17 was the best. Training continued to epoch 24 before stopping. In the fine-tuning run, epoch 1 was the best. Training continued to epoch 6. Without <code>restore_best_weights=True</code>, both returned models would have been worse. This flag is not optional.</p>
+
+    <div class="callout ok">
+      <div class="callout-label">Recommended Sequence for Transfer Learning Projects</div>
+      <p>Fix and verify the preprocessing pipeline first with a pixel range sanity check. Train with a frozen base and confirm correct output shapes. Add all regularization techniques as a group — not one at a time. Only fine-tune after the head is stable. Keep the fine-tuning learning rate at least 10× below the initial LR. This sequence prevents chasing bugs caused by a broken pipeline underneath everything else.</p>
+    </div>
+  </div>
+
+</main>
+
+<hr>
+<footer class="footer">
+  EfficientNetB0 · tf_flowers · TensorFlow 2.x · Google Colab T4 GPU &nbsp;·&nbsp; April 2026
+</footer>
+
+</body>
+</html>
